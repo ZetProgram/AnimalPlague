@@ -1,0 +1,4 @@
+name: AnimalPlague
+version: '1.0-SNAPSHOT'
+main: io.zetprogram.animalPlague.AnimalPlague
+api-version: '1.20'
