@@ -1,0 +1,10 @@
+# SETTINGS FOR ANIMAL PLAGUE
+infection:
+    check-radius: 10
+    max-animals: 5
+    infection-time: 300
+    spread-chance: 0.3
+
+entites:
+  - "CHICKEN"
+  - "COW"
