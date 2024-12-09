@@ -1,43 +1,37 @@
 package io.zetprogram.animalPlague;
 
-import io.zetprogram.animalPlague.commands.Reload;
+import io.zetprogram.animalPlague.commands.AnimalPlagueCommand;
+import io.zetprogram.animalPlague.plagues.DiseaseRegistry;
+import io.zetprogram.animalPlague.plagues.Population;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
-import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.entity.Entity;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.player.PlayerInteractAtEntityEvent;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitRunnable;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 
 public final class AnimalPlague extends JavaPlugin implements Listener {
 
-    private final List<String> registeredEntityNames = new ArrayList<String>();
-
-    private static int CHECK_RADIUS = 10; // Default 10
-    private static int MAX_ANIMALS = 5; // Default 5
-    private static long INFECTION_TIME = 300L; // 15s (1s = 20L)
-
-    private final Set<UUID> infectedAnimals = new HashSet<UUID>();
-
     @Override
     public void onEnable() {
-
+        saveDefaultConfig();
+        loadConfigValues();
         Bukkit.getPluginManager().registerEvents(this, this);
 
-        getCommand("animalplague").setExecutor(new Reload(this));
+        registerCommands();
 
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                checkAndInfectAnimals();
-            }
-        }.runTaskTimer(this, 0, INFECTION_TIME);
+        registerPlagues();
 
         this.getLogger().info("Plugin Startet");
 
@@ -48,42 +42,62 @@ public final class AnimalPlague extends JavaPlugin implements Listener {
         // Plugin shutdown logic
     }
 
+
+    private void registerPlagues() {
+        new Population(this);
+    }
+
+    private void registerCommands() {
+        getCommand("animalplague").setExecutor(new AnimalPlagueCommand(this));
+    }
+
+
     public void loadConfigValues() {
         FileConfiguration config = getConfig();
-
-        CHECK_RADIUS = config.getInt("infection.check-radius");
-        MAX_ANIMALS = config.getInt("infection.max-animals");
-        INFECTION_TIME = config.getInt("infection.infection-time");
 
         registerEntitiesFromConfig(config);
     }
 
     private void registerEntitiesFromConfig(FileConfiguration config) {
-        registeredEntityNames.addAll(config.getStringList("entites"));
-    }
+        DiseaseRegistry.diseaseEntities.clear();
 
-    private void checkAndInfectAnimals() {
-        for (Entity entity : Bukkit.getWorlds().get(0).getEntities()) {
-            if (registeredEntityNames.contains(entity.getType().name())) {
-                Location location = entity.getLocation();
-                List<Entity> nearbyEntities = (List<Entity>) location.getWorld().getNearbyEntities(location, CHECK_RADIUS, CHECK_RADIUS, CHECK_RADIUS);
+        ConfigurationSection plaguesSection = config.getConfigurationSection("Plagues");
+        if (plaguesSection == null) {
+            this.getLogger().warning("No plagues found in the configuration!");
+            return;
+        }
 
-                if (nearbyEntities.size() > MAX_ANIMALS) {
-                    infectedAnimals.add(entity.getUniqueId());
+        for (String plagueName : plaguesSection.getKeys(false)) {
+            ConfigurationSection plagueSection = plaguesSection.getConfigurationSection(plagueName);
 
+            if (plagueSection != null) {
+                boolean enabled = plagueSection.getBoolean("enabled", false);
+                if (!enabled) {
+                    this.getLogger().info("Skipping disabled plague: " + plagueName);
+                    continue;
                 }
+
+                List<String> entities = plagueSection.getStringList("entites");
+                if (entities.isEmpty()) {
+                    this.getLogger().warning("No entities found for plague: " + plagueName);
+                    continue;
+                }
+
+                DiseaseRegistry.diseaseEntities.put(plagueName, new ArrayList<>(entities));
+                this.getLogger().info("Registered plague '" + plagueName + "' with entities: " + entities);
             }
         }
     }
 
     @EventHandler
-    public void onAnimalDeath(EntityDeathEvent event) {
-        Entity entity = event.getEntity();
+    public void onInteract(PlayerInteractEntityEvent event) {
+        ItemStack infoStick = new ItemStack(Material.STICK);
+        ItemMeta infoStickMeta = infoStick.getItemMeta();
+        infoStickMeta.displayName(Component.text("Infostick", NamedTextColor.GREEN));
+        infoStick.setItemMeta(infoStickMeta);
 
-        if (infectedAnimals.contains(entity.getUniqueId())) {
-            event.getDrops().clear();
-            event.getDrops().add(new ItemStack(Material.ROTTEN_FLESH, new Random().nextInt(3)));
-            infectedAnimals.remove(entity.getUniqueId());
+        if (Objects.equals(event.getPlayer().getItemOnCursor().getItemMeta().displayName(), infoStick.getItemMeta().displayName())) {
+            event.getPlayer().sendMessage("EntityType: " + event.getRightClicked().getType().name());
         }
     }
 }

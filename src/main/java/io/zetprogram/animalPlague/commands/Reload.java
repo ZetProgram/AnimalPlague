@@ -1,6 +1,5 @@
 package io.zetprogram.animalPlague.commands;
 
-import io.zetprogram.animalPlague.AnimalPlague;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -16,13 +15,14 @@ public class Reload implements CommandExecutor {
     }
 
     @Override
-    public boolean onCommand(@NotNull CommandSender commandSender, @NotNull Command command, @NotNull String s, @NotNull String[] args) {
-        if(args.length > 0 && args[0].equalsIgnoreCase("reload")) {
-            _plugin.reloadConfig();
-            ((AnimalPlague)_plugin).loadConfigValues();
-            commandSender.sendMessage("§aConfig erfolgreich neu geladen!");
+    public boolean onCommand(CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
+        if (!sender.hasPermission("animalplague.reload")) {
+            sender.sendMessage("§cYou don't have permission to use this command!");
             return true;
         }
-        return false;
+
+        _plugin.reloadConfig();
+        sender.sendMessage("§aConfiguration reloaded.");
+        return true;
     }
 }
