@@ -2,7 +2,6 @@ package io.zetprogram.animalPlague.plagues;
 
 import io.zetprogram.animalPlague.AnimalPlague;
 import org.bukkit.Bukkit;
-import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.EventHandler;
@@ -47,36 +46,17 @@ public class Population implements Listener {
     }
 
     private void checkAndInfectAnimals(List<String> registeredEntities) {
+        // Iterate over all living entities in the world
         for (Entity entity : Bukkit.getWorlds().get(0).getEntities()) {
             if (infectedAnimals.contains(entity.getUniqueId())) continue;
 
             if (registeredEntities.contains(entity.getType().name())) {
-                Location location = entity.getLocation();
-                List<Entity> nearbyEntities = (List<Entity>) location.getWorld().getNearbyEntities(location, check_radius, check_radius, check_radius);
+                List<LivingEntity> nearbyEntities = entity.getLocation().getNearbyEntities(check_radius, check_radius, check_radius).stream().filter(e -> e instanceof LivingEntity && !infectedAnimals.contains(e.getUniqueId())).map(e -> (LivingEntity) e).filter(e -> registeredEntities.contains(e.getType().name())).toList();
 
-                List<Entity> candidateEntities = new ArrayList<>();
-                for (Entity nearby : nearbyEntities) {
-                    if (!infectedAnimals.contains(nearby.getUniqueId()) && registeredEntities.contains(nearby.getType().name())) {
-                        boolean isAlreadyInfectedNearby = nearbyEntities.stream().anyMatch(e -> infectedAnimals.contains(e.getUniqueId()));
+                if (nearbyEntities.size() > max_animals) {
+                    LivingEntity toInfect = nearbyEntities.get(new Random().nextInt(nearbyEntities.size()));
 
-                        if (isAlreadyInfectedNearby) {
-                            continue;
-                        }
-
-                        candidateEntities.add(nearby);
-                    }
-                }
-
-                if (candidateEntities.size() > max_animals) {
-                    Entity toInfect = candidateEntities.get(new Random().nextInt(candidateEntities.size()));
-
-                    infectedAnimals.add(toInfect.getUniqueId());
-
-                    if (toInfect instanceof LivingEntity livingEntity) {
-                        livingEntity.addPotionEffect(new PotionEffect(PotionEffectType.POISON, Integer.MAX_VALUE, 0, true, true));
-                    }
-
-                    _plugin.getLogger().info("Infected " + toInfect.getType().name() + " with disease: " + "OverpopulationSyndrome");
+                    infectEntity(toInfect, PotionEffectType.POISON);
                     break;
                 }
             }
@@ -84,48 +64,26 @@ public class Population implements Listener {
     }
 
     private void spreadInfection() {
-        List<UUID> newInfections = new ArrayList<>();
+        List<Entity> newInfections = new ArrayList<>();
 
         for (UUID infectedId : infectedAnimals) {
-            Entity infectedEntity = Bukkit.getEntity(infectedId);
-            if (infectedEntity == null || !(infectedEntity instanceof LivingEntity)) {
-                continue;
-            }
+            LivingEntity infectedEntity = (LivingEntity) Bukkit.getEntity(infectedId);
+            if (infectedEntity == null) continue;
 
-            LivingEntity livingInfected = (LivingEntity) infectedEntity;
-            Location infectedLocation = livingInfected.getLocation();
-            List<Entity> nearbyEntities = (List<Entity>) infectedLocation.getWorld().getNearbyEntities(infectedLocation, check_radius, check_radius, check_radius);
+            List<LivingEntity> nearbyEntities = infectedEntity.getLocation().getNearbyEntities(check_radius, check_radius, check_radius).stream().filter(e -> e != null).map(e -> (LivingEntity) e).filter(e -> !infectedAnimals.contains(e.getUniqueId()) && e.getType().equals(infectedEntity.getType()) && Math.random() < spread_chance).toList();
 
-            for (Entity nearby : nearbyEntities) {
-                if (nearby instanceof LivingEntity && !infectedAnimals.contains(nearby.getUniqueId()) && !infectedEntity.getUniqueId().equals(nearby.getUniqueId()) // Verhindere, dass sich das Tier selbst infiziert
-                        && registeredEntityTypesMatch(infectedEntity, nearby) // Überprüfe, ob der Typ übereinstimmt
-                        && spreadChance()) { // Überprüfe die Chance, dass die Krankheit sich ausbreitet
-
-                    newInfections.add(nearby.getUniqueId());
-                    break; // Breche die Schleife nach der ersten Infektion ab
-                }
+            if (!nearbyEntities.isEmpty()) {
+                newInfections.add(nearbyEntities.get(0)); // Only infect one per cycle
             }
         }
 
-        if (!newInfections.isEmpty()) {
-            UUID newInfectedId = newInfections.get(0); // Wähle das erste neue infizierte Tier
-            infectedAnimals.add(newInfectedId);
-
-            Entity newInfectedEntity = Bukkit.getEntity(newInfectedId);
-            if (newInfectedEntity instanceof LivingEntity newInfected) {
-                newInfected.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, Integer.MAX_VALUE, 0, true, true));
-            }
-
-            _plugin.getLogger().info("Infected " + newInfectedEntity.getType().name() + " with disease: " + "OverpopulationSyndrome");
-        }
+        newInfections.forEach(e -> infectEntity((LivingEntity) e, PotionEffectType.WITHER));
     }
 
-    private boolean registeredEntityTypesMatch(Entity infectedEntity, Entity nearbyEntity) {
-        return infectedEntity.getType().equals(nearbyEntity.getType());
-    }
 
-    private boolean spreadChance() {
-        return Math.random() < spread_chance;
+    private void infectEntity(LivingEntity entity, PotionEffectType effectType) {
+        infectedAnimals.add(entity.getUniqueId());
+        entity.addPotionEffect(new PotionEffect(effectType, Integer.MAX_VALUE, 0, false, false));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)

@@ -7,6 +7,9 @@ Plagues:
       max-animals: 5
       infection-time: 300L
       spread-chance: 0.3
+      stages:
+        infection-to-effect: 600 # ticks (30 Sekunden)
+        effect-to-death: 1200    # ticks (60 Sekunden)
     entites:
       - "CHICKEN"
       - "COW"

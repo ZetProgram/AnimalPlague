@@ -2,6 +2,7 @@ package io.zetprogram.animalPlague.commands;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -16,17 +17,17 @@ public class InfoStick implements CommandExecutor {
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("§cOnly players can use this command!");
+            sender.sendMessage(ChatColor.GRAY + "Only players can use this command!");
             return true;
         }
 
         ItemStack infoStick = new ItemStack(Material.STICK);
         ItemMeta infoStickMeta = infoStick.getItemMeta();
-        infoStickMeta.displayName(Component.text("Infostick", NamedTextColor.GREEN));
+        infoStickMeta.setDisplayName(ChatColor.GREEN + "Infostick");
         infoStick.setItemMeta(infoStickMeta);
 
         player.getInventory().addItem(infoStick);
-        player.sendMessage("§aYou received an InfoStick!");
+        player.sendMessage(ChatColor.GREEN + "You received an InfoStick!");
         return true;
     }
 }
